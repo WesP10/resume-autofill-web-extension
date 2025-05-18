@@ -1,0 +1,17 @@
+{
+  "name": "Job Application Assistant",
+  "description": "Automate job application form filling",
+  "version": "1.0",
+  "manifest_version": 3,
+  "action": {
+    "default_popup": "boardUser.html",
+    "default_icon": "res/resume.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
