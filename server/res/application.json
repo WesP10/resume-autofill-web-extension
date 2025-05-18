@@ -1,0 +1,9 @@
+{
+  "job_application_details": {
+    "job_title": "Software Engineer",
+    "job_id": "SE2025",
+    "company": "ABC Tech",
+    "application_deadline": "May 31, 2025",
+    "submission_method": ["Online Portal", "Email"]
+  }
+}
