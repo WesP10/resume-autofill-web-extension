@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadButton = document.getElementById('uploadButton');
     const status = document.getElementById('status');
     const saveButton = document.getElementById('saveButton');
+    const resumeStatus = document.getElementById('resumeStatus');
 
     // Minimal user object
     let user = {
@@ -12,11 +13,25 @@ document.addEventListener('DOMContentLoaded', function() {
         isInDB: false
     };
 
+    // Update resume status indicator
+    function updateResumeStatus() {
+        if (user.isInDB) {
+            resumeStatus.className = 'resume-status uploaded';
+            resumeStatus.querySelector('.status-icon').textContent = 'check_circle';
+            resumeStatus.querySelector('.status-text').textContent = 'Resume uploaded';
+        } else {
+            resumeStatus.className = 'resume-status not-uploaded';
+            resumeStatus.querySelector('.status-icon').textContent = 'radio_button_unchecked';
+            resumeStatus.querySelector('.status-text').textContent = 'No resume uploaded';
+        }
+    }
+
     // Load saved user data when popup opens
     chrome.storage.local.get(['userData'], function(result) {
         if (result.userData) {
             user = result.userData;
             document.getElementById('fullName').value = user.name || '';
+            updateResumeStatus();
         }
     });
 
@@ -58,21 +73,58 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Handle file upload
-    function handleFiles(files) {
+    async function handleFiles(files) {
         const file = files[0];
         if (file) {
-            // Check file type and upload to node server if valid
-            const validDocumentTypes = [
-                'application/pdf',  // PDF
-                'application/msword',  // DOC
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // DOCX
-                'text/plain'  // TXT
+            // Check file type
+            const allowedTypes = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'text/plain'
             ];
-            if (!validDocumentTypes.includes(file.type)) {
-                showStatus('Please upload a PDF, DOC, DOCX, or TXT file', 'error');
+
+            if (!allowedTypes.includes(file.type)) {
+                showStatus('Invalid file type. Please upload PDF, DOC, DOCX, or TXT files only.', 'error');
                 return;
             }
-            showStatus('Resume uploaded successfully!', 'success');
+
+            // Check file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                showStatus('File size too large. Maximum size is 5MB.', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('resume', file);
+                formData.append('uid', user.uid);
+
+                showStatus('Uploading resume...', 'info');
+
+                const response = await fetch('http://localhost:3000/upload-resume', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                user.isInDB = true;
+                saveUserData();
+                updateResumeStatus();
+                showStatus('Resume uploaded successfully!', 'success');
+            } catch (error) {
+                console.error('Upload error:', error);
+                if (error.message === 'Failed to fetch') {
+                    showStatus('Cannot connect to server. Please make sure the server is running on port 3000.', 'error');
+                } else {
+                    showStatus(error.message || 'Error uploading resume. Please try again.', 'error');
+                }
+            }
         }
     }
 

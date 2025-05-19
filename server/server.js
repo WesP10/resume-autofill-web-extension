@@ -5,13 +5,24 @@ require('dotenv').config();
 const app = express();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
+// Enable CORS for Chrome extension
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(process.env.MONGODB_URI, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
 });
 
 // Define Resume Schema
@@ -44,8 +55,16 @@ let Resume;
 
 async function connectToDatabase() {
     try {
+        if (!process.env.MONGODB_URI) {
+            throw new Error('MONGODB_URI is not defined in environment variables');
+        }
+
+        console.log('Attempting to connect to MongoDB Atlas...');
         await client.connect();
+        console.log('Connected to MongoDB Atlas');
+        
         db = client.db("resumeDB");
+        console.log('Using database: resumeDB');
         
         // Create or update the collection with schema validation
         try {
@@ -67,10 +86,14 @@ async function connectToDatabase() {
         
         // Create indexes
         await Resume.createIndex({ uid: 1 }, { unique: true });
+        console.log("Created unique index on uid field");
         
         console.log("Successfully connected to MongoDB Atlas!");
     } catch (error) {
         console.error("Error connecting to MongoDB Atlas:", error);
+        if (error.message.includes('bad auth')) {
+            console.error('Authentication failed. Please check your MongoDB Atlas username and password in the .env file.');
+        }
         process.exit(1);
     }
 }
@@ -117,6 +140,12 @@ const upload = multer({
 
 // Middleware to parse JSON
 app.use(express.json());
+
+app.use(express.urlencoded({ extended: true }));
+app.post('/test', (req, res) => {
+    console.log('Received data:', req.body);
+    res.json({ message: 'Data received successfully', data: req.body });
+});
 
 // Upload endpoint
 app.post('/upload-resume', upload.single('resume'), async (req, res) => {
@@ -169,5 +198,11 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log('=================================');
+    console.log(`Server is running at:`);
+    console.log(`http://localhost:${PORT}`);
+    console.log('Available endpoints:');
+    console.log(`- POST http://localhost:${PORT}/upload-resume`);
+    console.log(`- POST http://localhost:${PORT}/test`);
+    console.log('=================================');
 }); 

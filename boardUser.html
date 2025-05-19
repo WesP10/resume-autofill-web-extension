@@ -2,7 +2,8 @@
 <html>
 <head>
     <title>Job Application Assistant</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self'; style-src 'self' https://fonts.googleapis.com; connect-src 'self' http://localhost:3000/">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,6 +16,10 @@
             <div class="upload-text">or</div>
             <input type="file" id="fileInput" class="file-input" accept=".pdf,.doc,.docx,.txt">
             <button type="button" id="uploadButton">Choose File</button>
+            <div id="resumeStatus" class="resume-status">
+                <span class="material-icons status-icon">radio_button_unchecked</span>
+                <span class="status-text">No resume uploaded</span>
+            </div>
         </div>
 
         <div class="additional-info">
