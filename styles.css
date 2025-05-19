@@ -34,9 +34,10 @@ h1 {
 }
 
 .upload-icon {
-    font-size: 48px;
+    font-size: 24px;
     color: #3498db;
     margin-bottom: 10px;
+    font-weight: bold;
 }
 
 .file-input {
@@ -46,6 +47,7 @@ h1 {
 .upload-text {
     color: #666;
     margin: 10px 0;
+    font-size: 14px;
 }
 
 .additional-info {
@@ -53,35 +55,42 @@ h1 {
 }
 
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     color: #2c3e50;
     font-weight: 500;
+    font-size: 14px;
 }
 
-input[type="text"],
-input[type="email"],
-textarea {
+input[type="text"] {
     width: 100%;
-    padding: 8px;
+    padding: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
     box-sizing: border-box;
+    font-size: 14px;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
 }
 
 button {
     background-color: #3498db;
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 12px 20px;
     border-radius: 4px;
     cursor: pointer;
     width: 100%;
-    font-size: 16px;
+    font-size: 14px;
+    font-weight: 500;
     transition: background-color 0.3s;
 }
 
@@ -90,10 +99,12 @@ button:hover {
 }
 
 .status {
-    margin-top: 10px;
-    padding: 10px;
+    margin-top: 15px;
+    padding: 12px;
     border-radius: 4px;
     display: none;
+    font-size: 14px;
+    text-align: center;
 }
 
 .success {
