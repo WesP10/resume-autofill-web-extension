@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Job Application Assistant</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self'; style-src 'self' https://fonts.googleapis.com; connect-src 'self' http://localhost:3000/">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; connect-src 'self' http://localhost:3000/">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -10,25 +10,199 @@
     <div class="container">
         <h1>Job Application Assistant</h1>
         
-        <div class="upload-section" id="dropZone">
-            <div class="upload-icon">Upload</div>
-            <div class="upload-text">Drag & Drop your resume here</div>
-            <div class="upload-text">or</div>
-            <input type="file" id="fileInput" class="file-input" accept=".pdf,.doc,.docx,.txt">
-            <button type="button" id="uploadButton">Choose File</button>
-            <div id="resumeStatus" class="resume-status">
-                <span class="material-icons status-icon">radio_button_unchecked</span>
-                <span class="status-text">No resume uploaded</span>
+        <!-- Initial State UI -->
+        <div id="initialState" class="state-container">
+            <div class="upload-section" id="dropZone">
+                <div class="upload-icon">Upload</div>
+                <div class="upload-text">Drag & Drop your resume here</div>
+                <div class="upload-text">or</div>
+                <input type="file" id="fileInput" class="file-input" accept=".pdf,.doc,.docx,.txt">
+                <button type="button" id="uploadButton">Choose File</button>
+                <div id="resumeStatus" class="resume-status">
+                    <span class="material-icons status-icon">radio_button_unchecked</span>
+                    <span class="status-text">No resume uploaded</span>
+                </div>
+            </div>
+
+            <div class="additional-info">
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" placeholder="Enter your full name">
+                </div>
+
+                <button type="button" id="saveButton">Save Information</button>
             </div>
         </div>
 
-        <div class="additional-info">
-            <div class="form-group">
-                <label for="fullName">Full Name</label>
-                <input type="text" id="fullName" placeholder="Enter your full name">
+        <!-- Loaded State UI -->
+        <div id="loadedState" class="state-container hidden">
+            <div class="user-info">
+                <div class="user-header">
+                    <span class="material-icons user-icon">account_circle</span>
+                    <h2 id="displayName">User Name</h2>
+                </div>
+                <div class="resume-info">
+                    <span class="material-icons">description</span>
+                    <span>Resume uploaded</span>
+                </div>
+                <button type="button" id="editButton" class="secondary-button">
+                    <span class="material-icons">edit</span>
+                    Edit Information
+                </button>
+            </div>
+        </div>
+
+        <!-- Edit Information UI -->
+        <div id="editState" class="state-container hidden">
+            <div class="edit-header">
+                <h2>Edit Information</h2>
+                <button type="button" id="exitEditButton" class="icon-button">
+                    <span class="material-icons">close</span>
+                </button>
             </div>
 
-            <button type="button" id="saveButton">Save Information</button>
+            <form id="editForm" class="edit-form">
+                <!-- Personal Information -->
+                <section class="form-section">
+                    <h3>Personal Information</h3>
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" id="fullName" name="fullName">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="address">Address</label>
+                        <input type="text" id="address" name="address">
+                    </div>
+                    <div class="form-group">
+                        <label for="linkedin">LinkedIn Profile</label>
+                        <input type="url" id="linkedin" name="linkedin">
+                    </div>
+                    <div class="form-group">
+                        <label for="portfolio">Portfolio Website</label>
+                        <input type="url" id="portfolio" name="portfolio">
+                    </div>
+                </section>
+
+                <!-- Resume Information -->
+                <section class="form-section">
+                    <h3>Resume Information</h3>
+                    <div class="form-group">
+                        <label for="objective">Career Objective</label>
+                        <textarea id="objective" name="objective" rows="3"></textarea>
+                    </div>
+
+                    <!-- Education -->
+                    <div class="form-group">
+                        <label>Education</label>
+                        <div id="educationList" class="list-container">
+                            <!-- Education entries will be added here -->
+                        </div>
+                        <button type="button" class="add-button" data-section="education">
+                            <span class="material-icons">add</span> Add Education
+                        </button>
+                    </div>
+
+                    <!-- Experience -->
+                    <div class="form-group">
+                        <label>Work Experience</label>
+                        <div id="experienceList" class="list-container">
+                            <!-- Experience entries will be added here -->
+                        </div>
+                        <button type="button" class="add-button" data-section="experience">
+                            <span class="material-icons">add</span> Add Experience
+                        </button>
+                    </div>
+
+                    <!-- Skills -->
+                    <div class="form-group">
+                        <label for="skills">Skills (comma-separated)</label>
+                        <input type="text" id="skills" name="skills">
+                    </div>
+
+                    <!-- Certifications -->
+                    <div class="form-group">
+                        <label>Certifications</label>
+                        <div id="certificationsList" class="list-container">
+                            <!-- Certification entries will be added here -->
+                        </div>
+                        <button type="button" class="add-button" data-section="certifications">
+                            <span class="material-icons">add</span> Add Certification
+                        </button>
+                    </div>
+
+                    <!-- Projects -->
+                    <div class="form-group">
+                        <label>Projects</label>
+                        <div id="projectsList" class="list-container">
+                            <!-- Project entries will be added here -->
+                        </div>
+                        <button type="button" class="add-button" data-section="projects">
+                            <span class="material-icons">add</span> Add Project
+                        </button>
+                    </div>
+
+                    <!-- Languages -->
+                    <div class="form-group">
+                        <label>Languages</label>
+                        <div id="languagesList" class="list-container">
+                            <!-- Language entries will be added here -->
+                        </div>
+                        <button type="button" class="add-button" data-section="languages">
+                            <span class="material-icons">add</span> Add Language
+                        </button>
+                    </div>
+
+                    <!-- Hobbies -->
+                    <div class="form-group">
+                        <label for="hobbies">Hobbies (comma-separated)</label>
+                        <input type="text" id="hobbies" name="hobbies">
+                    </div>
+                </section>
+
+                <!-- Cover Letter -->
+                <section class="form-section">
+                    <h3>Cover Letter</h3>
+                    <div class="form-group">
+                        <label for="recipientName">Recipient Name</label>
+                        <input type="text" id="recipientName" name="recipientName">
+                    </div>
+                    <div class="form-group">
+                        <label for="companyName">Company Name</label>
+                        <input type="text" id="companyName" name="companyName">
+                    </div>
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <input type="text" id="subject" name="subject">
+                    </div>
+                    <div class="form-group">
+                        <label for="coverLetterBody">Body</label>
+                        <textarea id="coverLetterBody" name="coverLetterBody" rows="6"></textarea>
+                    </div>
+                </section>
+
+                <!-- References -->
+                <section class="form-section">
+                    <h3>References</h3>
+                    <div id="referencesList" class="list-container">
+                        <!-- Reference entries will be added here -->
+                    </div>
+                    <button type="button" class="add-button" data-section="references">
+                        <span class="material-icons">add</span> Add Reference
+                    </button>
+                </section>
+
+                <div class="form-actions">
+                    <button type="submit" class="primary-button">Save Changes</button>
+                </div>
+            </form>
         </div>
 
         <div id="status" class="status"></div>

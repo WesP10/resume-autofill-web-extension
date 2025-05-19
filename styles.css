@@ -66,7 +66,12 @@ label {
     font-size: 14px;
 }
 
-input[type="text"] {
+/* Standardize input borders for all input types */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+input[type="number"] {
     width: 100%;
     padding: 10px;
     border: 1px solid #ddd;
@@ -75,7 +80,11 @@ input[type="text"] {
     font-size: 14px;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+input[type="number"]:focus {
     outline: none;
     border-color: #3498db;
     box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
@@ -153,4 +162,250 @@ button:hover {
 
 .resume-status.uploaded .status-icon {
     color: #2e7d32;
+}
+
+.state-container {
+    transition: all 0.3s ease;
+}
+
+.user-info {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.user-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.user-icon {
+    font-size: 32px;
+    color: #3498db;
+}
+
+.user-header h2 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 20px;
+}
+
+.resume-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #2e7d32;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.resume-info .material-icons {
+    color: #2e7d32;
+}
+
+.secondary-button {
+    background-color: #f8f9fa;
+    color: #3498db;
+    border: 1px solid #3498db;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: auto;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+}
+
+.secondary-button:hover {
+    background-color: #3498db;
+    color: white;
+}
+
+.secondary-button .material-icons {
+    font-size: 18px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Edit Information UI Styles */
+.edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.edit-header h2 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 20px;
+}
+
+.icon-button {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s;
+    width: 32px;
+    height: 32px;
+}
+
+.icon-button:hover {
+    background-color: #f0f0f0;
+}
+
+.edit-form {
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.form-section {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.form-section h3 {
+    color: #2c3e50;
+    font-size: 16px;
+    margin: 0 0 15px 0;
+}
+
+textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.list-container {
+    margin-bottom: 10px;
+}
+
+.list-item {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+/* Fix close icon hover and centering */
+.list-item .remove-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.list-item .remove-button:hover {
+    background-color: #fff3f3;
+}
+
+.list-item .remove-button .material-icons {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.add-button {
+    background-color: #f8f9fa;
+    color: #3498db;
+    border: 1px solid #3498db;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    width: auto;
+    margin-top: 10px;
+}
+
+.add-button:hover {
+    background-color: #3498db;
+    color: white;
+}
+
+.add-button .material-icons {
+    font-size: 18px;
+}
+
+.form-actions {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.primary-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+.primary-button:hover {
+    background-color: #2980b9;
+}
+
+/* Scrollbar Styles */
+.edit-form::-webkit-scrollbar {
+    width: 8px;
+}
+
+.edit-form::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.edit-form::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.edit-form::-webkit-scrollbar-thumb:hover {
+    background: #555;
 } 
