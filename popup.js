@@ -22,11 +22,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update UI state
     function updateUIState() {
-        if (user.name && user.isInDB) {
+        if (user.name || user.personal_information?.full_name) {
             initialState.classList.add('hidden');
             loadedState.classList.remove('hidden');
             editState.classList.add('hidden');
-            displayName.textContent = user.name;
+            displayName.textContent = user.personal_information?.full_name || user.name || '';
         } else {
             initialState.classList.remove('hidden');
             loadedState.classList.add('hidden');
@@ -51,7 +51,10 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.storage.local.get(['userData'], function(result) {
         if (result.userData) {
             user = result.userData;
-            document.getElementById('fullName').value = user.name || '';
+            // Update the display name with the full name from personal information
+            const fullName = user.personal_information?.full_name || user.name || '';
+            document.getElementById('fullName0').value = fullName;
+            displayName.textContent = fullName;
             updateResumeStatus();
             updateUIState();
         }
@@ -218,7 +221,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const personalInfo = user.personal_information || {};
         const contactDetails = personalInfo.contact_details || {};
         
-        document.getElementById('fullName').value = personalInfo.full_name || '';
+        // Use either personal_information.full_name or user.name
+        const fullName = personalInfo.full_name || user.name || '';
+        document.getElementById('fullName').value = fullName;
         document.getElementById('email').value = contactDetails.email || '';
         document.getElementById('phone').value = contactDetails.phone_number || '';
         document.getElementById('address').value = contactDetails.address || '';
@@ -240,12 +245,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Populate lists with proper error handling
         try {
-            populateList('educationList', resumeInfo.education || [], createEducationItem);
-            populateList('experienceList', resumeInfo.experience || [], createExperienceItem);
-            populateList('certificationsList', resumeInfo.certifications || [], createCertificationItem);
-            populateList('projectsList', resumeInfo.projects || [], createProjectItem);
-            populateList('languagesList', resumeInfo.languages || [], createLanguageItem);
-            populateList('referencesList', user.references || [], createReferenceItem);
+            // Ensure arrays exist and are properly formatted
+            const education = Array.isArray(resumeInfo.education) ? resumeInfo.education : [];
+            const experience = Array.isArray(resumeInfo.experience) ? resumeInfo.experience : [];
+            const certifications = Array.isArray(resumeInfo.certifications) ? resumeInfo.certifications : [];
+            const projects = Array.isArray(resumeInfo.projects) ? resumeInfo.projects : [];
+            const languages = Array.isArray(resumeInfo.languages) ? resumeInfo.languages : [];
+            const references = Array.isArray(user.references) ? user.references : [];
+
+            populateList('educationList', education, createEducationItem);
+            populateList('experienceList', experience, createExperienceItem);
+            populateList('certificationsList', certifications, createCertificationItem);
+            populateList('projectsList', projects, createProjectItem);
+            populateList('languagesList', languages, createLanguageItem);
+            populateList('referencesList', references, createReferenceItem);
         } catch (error) {
             console.error('Error populating lists:', error);
         }
@@ -507,11 +520,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else if (input.name.includes('responsibilities')) {
                         data[name] = input.value.split('\n').filter(Boolean);
                     } else {
-                        data[name] = input.value;
+                        data[name] = input.value.trim();
                     }
                 }
             });
-            if (Object.keys(data).length > 0) {
+            // Only add the item if it has at least one non-empty value
+            if (Object.values(data).some(value => value !== null && value !== '')) {
                 items.push(data);
             }
         });
@@ -520,13 +534,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle save button click
     saveButton.addEventListener('click', () => {
-        user.name = document.getElementById('fullName').value;
+        const fullName = document.getElementById('fullName0').value;
+        user.name = fullName;
+        
+        // Also update the personal_information.full_name
+        if (!user.personal_information) {
+            user.personal_information = {};
+        }
+        user.personal_information.full_name = fullName;
 
-        if (!user.name && !user.isInDB) {
+        if (!fullName && !user.isInDB) {
             showStatus('Please enter your name and upload your resume', 'error');
             return;
         }
-        if (!user.name) {
+        if (!fullName) {
             showStatus('Please enter your name', 'error');
             return;
         }
@@ -573,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     isInDB: true
                 };
                 console.log('Updated user object:', user);
-                document.getElementById('fullName').value = user.personal_information?.full_name || '';
+                document.getElementById('fullName0').value = user.personal_information?.full_name || '';
                 updateResumeStatus();
                 updateUIState();
                 saveUserData(); // Save the updated user data to chrome storage

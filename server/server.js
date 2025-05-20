@@ -398,19 +398,20 @@ app.get('/resume-data/:uid', async (req, res) => {
 
 // In server.js, add basic input sanitization
 function sanitizeInput(input) {
+    if (Array.isArray(input)) {
+        return input.map(sanitizeInput);
+    }
     if (typeof input !== 'object' || input === null) {
         return input;
     }
-    
     const sanitized = {};
     for (const [key, value] of Object.entries(input)) {
         // Skip prototype pollution attempts
         if (key === '__proto__' || key === 'constructor') {
             continue;
         }
-        
         // Recursively sanitize nested objects
-        sanitized[key] = typeof value === 'object' ? sanitizeInput(value) : value;
+        sanitized[key] = sanitizeInput(value);
     }
     return sanitized;
 }
@@ -444,6 +445,7 @@ function validateRequest(req, res, next) {
 app.post('/save-user-data', validateRequest, (req, res, next) => {
     console.log('POST /save-user-data - Saving user data');
     req.body.userData = sanitizeInput(req.body.userData);
+    // console.log('Received data:', req.body);
     next();
 }, async (req, res) => {
     try {
@@ -452,6 +454,9 @@ app.post('/save-user-data', validateRequest, (req, res, next) => {
         if (!uid || !userData) {
             return res.status(400).json({ error: 'UID and user data are required' });
         }
+
+        // Helper function to ensure array data is properly formatted
+        const ensureArray = (data) => Array.isArray(data) ? data.filter(item => item !== null && item !== undefined) : [];
 
         // Ensure the document structure matches the schema exactly
         const documentToSave = {
@@ -468,13 +473,13 @@ app.post('/save-user-data', validateRequest, (req, res, next) => {
             },
             resume: {
                 objective: userData.resume?.objective || '',
-                education: Array.isArray(userData.resume?.education) ? userData.resume.education : [],
-                experience: Array.isArray(userData.resume?.experience) ? userData.resume.experience : [],
-                skills: Array.isArray(userData.resume?.skills) ? userData.resume.skills : [],
-                certifications: Array.isArray(userData.resume?.certifications) ? userData.resume.certifications : [],
-                projects: Array.isArray(userData.resume?.projects) ? userData.resume.projects : [],
-                languages: Array.isArray(userData.resume?.languages) ? userData.resume.languages : [],
-                hobbies: Array.isArray(userData.resume?.hobbies) ? userData.resume.hobbies : []
+                education: ensureArray(userData.resume?.education),
+                experience: ensureArray(userData.resume?.experience),
+                skills: ensureArray(userData.resume?.skills),
+                certifications: ensureArray(userData.resume?.certifications),
+                projects: ensureArray(userData.resume?.projects),
+                languages: ensureArray(userData.resume?.languages),
+                hobbies: ensureArray(userData.resume?.hobbies)
             },
             cover_letter: {
                 recipient_name: userData.cover_letter?.recipient_name || '',
@@ -482,8 +487,10 @@ app.post('/save-user-data', validateRequest, (req, res, next) => {
                 subject: userData.cover_letter?.subject || '',
                 body: userData.cover_letter?.body || ''
             },
-            references: Array.isArray(userData.references) ? userData.references : []
+            references: ensureArray(userData.references)
         };
+
+        console.log('Saving document:', JSON.stringify(documentToSave, null, 2));
 
         // Check if user data already exists
         const existingUser = await UserData.findOne({ uid });
