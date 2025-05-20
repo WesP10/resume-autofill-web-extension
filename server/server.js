@@ -5,6 +5,7 @@ require('dotenv').config();
 const app = express();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const fs = require('fs').promises;
+const fetch = require('node-fetch');
 
 // Enable CORS for Chrome extension
 app.use((req, res, next) => {
@@ -601,6 +602,64 @@ function rateLimiter(req, res, next) {
 // Apply to routes
 app.use('/api/', rateLimiter);
 
+// Add analyze-form endpoint
+app.post('/analyze-form', async (req, res) => {
+    console.log('POST /analyze-form - Analyzing form structure');
+    try {
+        const { domStructure, userData } = req.body;
+        
+        if (!domStructure || !userData) {
+            return res.status(400).json({ error: 'DOM structure and user data are required' });
+        }
+
+        // Prepare the prompt for the LLM
+        const prompt = {
+            role: "system",
+            content: `You are an AI assistant that helps fill out job application forms. 
+            Given a form structure and user data, you need to match form fields with appropriate user data.
+            Return an array of objects with 'selector' and 'value' properties.
+            The selector should be the most reliable way to identify the field (id, name, or label).
+            The value should be the appropriate data from the user object.
+            Only include fields that you are confident about matching.`
+        };
+
+        const userMessage = {
+            role: "user",
+            content: `Form Structure: ${JSON.stringify(domStructure, null, 2)}
+            User Data: ${JSON.stringify(userData, null, 2)}
+            Please provide fill instructions for this form.`
+        };
+
+        // Call OpenAI API
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: "gpt-4",
+                messages: [prompt, userMessage],
+                temperature: 0.3,
+                max_tokens: 1000
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to get response from OpenAI');
+        }
+
+        const data = await response.json();
+        const fillInstructions = JSON.parse(data.choices[0].message.content);
+
+        console.log('Generated fill instructions:', fillInstructions);
+        res.json(fillInstructions);
+    } catch (error) {
+        console.error('Error analyzing form:', error);
+        res.status(500).json({ error: 'Error analyzing form' });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log('=================================');
@@ -612,5 +671,6 @@ app.listen(PORT, () => {
     console.log(`- GET http://localhost:${PORT}/resume-data/:uid`);
     console.log(`- POST http://localhost:${PORT}/save-user-data`);
     console.log(`- GET http://localhost:${PORT}/user-data/:uid`);
+    console.log(`- POST http://localhost:${PORT}/analyze-form`);
     console.log('=================================');
 }); 

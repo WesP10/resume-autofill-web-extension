@@ -1,17 +1,27 @@
 {
-  "name": "Job Application Assistant",
-  "description": "Automate job application form filling",
-  "version": "1.0",
   "manifest_version": 3,
-  "action": {
-    "default_popup": "boardUser.html",
-    "default_icon": "res/resume.png"
-  },
+  "name": "Job Application Assistant",
+  "version": "1.0",
+  "description": "Automatically fills job application forms using your resume data",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:3000/"
+  "host_permissions": [
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "boardUser.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
   }
 }

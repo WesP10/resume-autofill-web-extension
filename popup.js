@@ -616,4 +616,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('No user data found in storage');
         }
     });
+
+    // Handle fill form button click
+    document.getElementById('fillFormButton').addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'startFormFill' });
+        window.close(); // Close the popup
+    });
 }); 
