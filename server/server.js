@@ -1,11 +1,25 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-require('dotenv').config();
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import dotenv from 'dotenv';
+import { MongoClient, ServerApiVersion } from 'mongodb';
+import fs from 'fs/promises';
+import { existsSync, mkdirSync } from 'fs';
+import fetch from 'node-fetch';
+import { LlamaCpp } from '@langchain/community/llms/llama_cpp';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+
+// Initialize environment variables
+dotenv.config();
+
+// Get current file path and directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const app = express();
-const { MongoClient, ServerApiVersion } = require('mongodb');
-const fs = require('fs').promises;
-const fetch = require('node-fetch');
 
 // Enable CORS for Chrome extension
 app.use((req, res, next) => {
@@ -109,9 +123,51 @@ const userDataSchema = {
 // Get database and collection
 let db;
 let Resume;
+let UserData;
 let isConnected = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Initialize LangChain model
+let langchainModel = null;
+async function initializeLangChain() {
+    try {
+        // Create models directory if it doesn't exist
+        const modelsDir = path.join(__dirname, 'models');
+        if (!existsSync(modelsDir)) {
+            mkdirSync(modelsDir, { recursive: true });
+        }
+
+        const modelPath = path.join(modelsDir, 'mistral-7b-instruct-v0.1.Q5_K_M.gguf');
+        
+        // Check if model file exists
+        if (!existsSync(modelPath)) {
+            console.log('Model file not found. Please place the model file at:', modelPath);
+            console.log('You can download the model from: https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF');
+            return;
+        }
+
+        console.log('Found existing model file');
+        langchainModel = await new LlamaCpp({ 
+            modelPath: modelPath,
+            temperature: 0.3,
+            maxTokens: 512,
+            topP: 0.95,
+            batchSize: 64,
+            contextSize: 1024,
+            threads: 4,
+            f16Kv: true,
+            repeatPenalty: 1.1,
+            stopSequences: ["</s>", "User:", "Assistant:"],
+            gpuLayers: 0,
+            seed: 42,
+            verbose: true
+        });
+        console.log('LangChain model initialized successfully');
+    } catch (error) {
+        console.error('Error initializing LangChain model:', error);
+    }
+}
 
 async function setupCollections() {
     try {
@@ -175,6 +231,9 @@ async function connectToDatabase() {
         
         // Set up collections and indexes
         await setupCollections();
+        
+        // Initialize LangChain on server start
+        await initializeLangChain();
         
         console.log("Successfully connected to MongoDB Atlas!");
     } catch (error) {
@@ -613,44 +672,77 @@ app.post('/analyze-form', async (req, res) => {
         }
 
         // Prepare the prompt for the LLM
-        const prompt = {
-            role: "system",
-            content: `You are an AI assistant that helps fill out job application forms. 
-            Given a form structure and user data, you need to match form fields with appropriate user data.
-            Return an array of objects with 'selector' and 'value' properties.
-            The selector should be the most reliable way to identify the field (id, name, or label).
-            The value should be the appropriate data from the user object.
-            Only include fields that you are confident about matching.`
-        };
+        const systemPrompt = `You are an AI assistant that helps fill out job application forms. 
+        Given a form structure and user data, you need to match form fields with appropriate user data.
+        Return an array of objects with 'selector' and 'value' properties.
+        The selector should be the most reliable way to identify the field (id, name, or label).
+        The value should be the appropriate data from the user object.
+        Only include fields that you are confident about matching.`;
 
-        const userMessage = {
-            role: "user",
-            content: `Form Structure: ${JSON.stringify(domStructure, null, 2)}
-            User Data: ${JSON.stringify(userData, null, 2)}
-            Please provide fill instructions for this form.`
-        };
+        // Truncate and format the input data to reduce token count
+        const truncatedDomStructure = Object.fromEntries(
+            Object.entries(domStructure)
+                .slice(0, 10)  // Further reduced to 10 form fields
+                .map(([key, value]) => [
+                    key,
+                    typeof value === 'object' ? {
+                        tag: value.tag,
+                        type: value.type,
+                        id: value.id,
+                        name: value.name,
+                        label: value.label?.substring(0, 30)  // Further reduced label length
+                    } : value
+                ])
+        );
 
-        // Call OpenAI API
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        // Simplify user data structure
+        const truncatedUserData = {
+            personal_information: {
+                full_name: userData.personal_information?.full_name,
+                contact_details: {
+                    email: userData.personal_information?.contact_details?.email,
+                    phone_number: userData.personal_information?.contact_details?.phone_number
+                }
             },
-            body: JSON.stringify({
-                model: "gpt-4",
-                messages: [prompt, userMessage],
-                temperature: 0.3,
-                max_tokens: 1000
-            })
-        });
+            resume: {
+                skills: userData.resume?.skills?.slice(0, 3),  // Further reduced to 3 skills
+                education: userData.resume?.education?.slice(0, 1)?.map(edu => ({
+                    degree: edu.degree,
+                    institution: edu.institution
+                })),
+                experience: userData.resume?.experience?.slice(0, 1)?.map(exp => ({
+                    job_title: exp.job_title,
+                    company: exp.company
+                }))
+            }
+        };
 
-        if (!response.ok) {
-            throw new Error('Failed to get response from OpenAI');
+        let fillInstructions;
+
+        // Try LangChain if available
+        if (langchainModel) {
+            try {
+                const systemMessage = new SystemMessage(systemPrompt);
+                const humanMessage = new HumanMessage(
+                    `Form Structure: ${JSON.stringify(truncatedDomStructure)}
+                    User Data: ${JSON.stringify(truncatedUserData)}
+                    Please provide fill instructions for this form.`
+                );
+
+                const prompt = ChatPromptTemplate.fromMessages([systemMessage, humanMessage]);
+                const chain = prompt.pipe(langchainModel);
+                
+                const result = await chain.invoke({});
+                
+                fillInstructions = JSON.parse(result);
+                console.log('Successfully used LangChain model');
+            } catch (error) {
+                console.error('LangChain error:', error);
+                return res.status(500).json({ error: 'Error processing with LangChain model' });
+            }
+        } else {
+            return res.status(503).json({ error: 'LLM model not available' });
         }
-
-        const data = await response.json();
-        const fillInstructions = JSON.parse(data.choices[0].message.content);
 
         console.log('Generated fill instructions:', fillInstructions);
         res.json(fillInstructions);
