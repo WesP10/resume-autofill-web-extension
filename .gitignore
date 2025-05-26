@@ -1,4 +1,5 @@
 # Dependencies
+node_modules/
 server/node_modules/
 npm-debug.log
 yarn-debug.log
@@ -12,6 +13,9 @@ server/.env
 server/.env.local
 server/.env.*.local
 
+# LLM model files
+server/models/*.gguf
+server/uploads
 
 # Upload directory
 server/uploads/
