@@ -118,6 +118,54 @@ const userDataSchema = {
     }
 };
 
+const mockFormFields = {
+    "2": {name: "01___title", type: "text"},
+    "3": {name: "02frstname", type: "text"},
+    "4": {name: "03middle_i", type: "text"},
+    "5": {name: "04lastname", type: "text"},
+    "6": {name: "04fullname", type: "text"},
+    "7": {name: "05_company", type: "text"},
+    "8": {name: "06position", type: "text"},
+    "9": {name: "10address1", type: "text"},
+    "10": {name: "11address2", type: "text"},
+    "11": {name: "13adr_city", type: "text"},
+    "12": {name: "14adrstate", type: "text"},
+    "13": {name: "15_country", type: "text"},
+    "14": {name: "16addr_zip", type: "text"},
+    "15": {name: "20homephon", type: "text"},
+    "16": {name: "21workphon", type: "text"},
+    "17": {name: "22faxphone", type: "text"},
+    "18": {name: "23cellphon", type: "text"},
+    "19": {name: "24emailadr", type: "text"},
+    "20": {name: "25web_site", type: "text"},
+    "21": {name: "30_user_id", type: "text"},
+    "24": {name: "41ccnumber", type: "text"},
+    "25": {name: "43cvc", type: "text"},
+    "28": {name: "44cc_uname", type: "text"},
+    "29": {name: "45ccissuer", type: "text"},
+    "30": {name: "46cccstsvc", type: "text"},
+    "31": {name: "60pers_sex", type: "text"},
+    "32": {name: "61pers_ssn", type: "text"},
+    "33": {name: "62driv_lic", type: "text"},
+    "37": {name: "66pers_age", type: "text"},
+    "38": {name: "67birth_pl", type: "text"},
+    "39": {name: "68__income", type: "text"},
+    "40": {name: "71__custom", type: "text"},
+    "41": {name: "72__commnt", type: "text"}
+};
+
+const exampleOutput = [
+    {selector: "2", value: "Mr."},
+    {selector: "3", value: "Weston"},
+    {selector: "4", value: "R"},
+    {selector: "5", value: "Clark"},
+    {selector: "6", value: "Weston Clark"},
+    {selector: "7", value: "Luraph"},
+    {selector: "8", value: "Front End Engineer"},
+    {selector: "9", value: "123 Main St"},
+    {selector: "10", value: "Apt 1"},
+    {selector: "11", value: "Anytown"},
+];
 // Get database and collection
 let db;
 let Resume;
@@ -736,20 +784,13 @@ app.post('/analyze-form', async (req, res) => {
         const { fields, userData: completeUserData } = truncateInputData(domStructure, userData);
 
         // Prepare the prompt for Ollama
-        const userPrompt = `Analyze the following form fields and user data to create fill instructions.
-        Return an array of JSON objects in the format [{selector: "field_id", value: "value_to_fill"}].
-        
+        const userPrompt = `
         Form Fields:
         ${JSON.stringify(fields, null, 2)}
         
         User Data:
         ${JSON.stringify(completeUserData, null, 2)}
-        
-        Instructions:
-        1. Match each form field to the most appropriate user data
-        2. Consider field names, types, and context
-        3. Return only valid JSON array with selector and value pairs
-        4. If no match is found for a field, omit it from the results`;
+        `;
 
         try {
             const response = await ollama.chat({
@@ -757,22 +798,28 @@ app.post('/analyze-form', async (req, res) => {
                 messages: [
                     {
                         role: 'system',
-                        content: `You are a form field analyzer. Your task is to match form fields with user data and return the results in a specific JSON format.
+                        content: `
+                        You are filling out a resume for your client. Client information is provided below.
+                        ${JSON.stringify(completeUserData, null, 2)}
+                        You need to fill out the form fields based on the client information.
+                        You need to return an array of JSON objects in the format [{selector: "integer_id", value: "actual_value_from_user_data"}].
+                        You need to find the best match for the form field in the user data or the closest match. Form fields are provided below.
+                        ${JSON.stringify(fields, null, 2)}
+                        Example output: ${JSON.stringify(exampleOutput, null, 2)}
+
                         Rules:
                         1. Always return a valid JSON array
                         2. Each object must have 'selector' and 'value' properties
-                        3. Use exact field IDs as selectors
-                        4. Match fields based on name, type, and context
-                        5. Skip fields that don't have a clear match
-                        6. Format values appropriately for each field type`
-                    },
-                    {
-                        role: 'user',
-                        content: userPrompt
+                        3. The selector must be the integer ID from the form field (e.g., "2" for field "2")
+                        4. Extract actual values from user data, don't return field names
+                        5. Look for matches in all sections of user data
+                        6. Skip fields that don't have a clear match
+                        `
                     }
                 ]
             });
 
+            console.log('User prompt:', userPrompt);
             console.log('Response:', response.message.content);
             const fillInstructions = JSON.parse(response.message.content);
             if (Array.isArray(fillInstructions)) {
