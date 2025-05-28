@@ -8,9 +8,7 @@ import { MongoClient, ServerApiVersion } from 'mongodb';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import fetch from 'node-fetch';
-import { LlamaCpp } from '@langchain/community/llms/llama_cpp';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
-import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import ollama from 'ollama';
 
 // Initialize environment variables
 dotenv.config();
@@ -128,45 +126,68 @@ let isConnected = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-// Initialize LangChain model
-let langchainModel = null;
-async function initializeLangChain() {
+// Initialize Ollama model
+let ollamaModel = null;
+async function initializeOllama() {
     try {
-        // Create models directory if it doesn't exist
-        const modelsDir = path.join(__dirname, 'models');
-        if (!existsSync(modelsDir)) {
-            mkdirSync(modelsDir, { recursive: true });
-        }
-
-        const modelPath = path.join(modelsDir, 'mistral-7b-instruct-v0.1.Q5_K_M.gguf');
-        
-        // Check if model file exists
-        if (!existsSync(modelPath)) {
-            console.log('Model file not found. Please place the model file at:', modelPath);
-            console.log('You can download the model from: https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF');
-            return;
-        }
-
-        console.log('Found existing model file');
-        langchainModel = await new LlamaCpp({ 
-            modelPath: modelPath,
-            temperature: 0.3,
-            maxTokens: 512,
-            topP: 0.95,
-            batchSize: 64,
-            contextSize: 1024,
-            threads: 4,
-            f16Kv: true,
-            repeatPenalty: 1.1,
-            stopSequences: ["</s>", "User:", "Assistant:"],
-            gpuLayers: 0,
-            seed: 42,
-            verbose: true
+        console.log('Initializing Ollama model...');
+        // Test the connection to Ollama
+        const response = await ollama.chat({
+            model: 'gemma3:1b',
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are a helpful assistant.'
+                },
+                {
+                    role: 'user',
+                    content: 'Hello'
+                }
+            ]
         });
-        console.log('LangChain model initialized successfully');
+        console.log('Ollama model initialized successfully');
+        ollamaModel = true;
     } catch (error) {
-        console.error('Error initializing LangChain model:', error);
+        console.error('Error initializing Ollama model:', error);
     }
+}
+
+// Add this function to truncate input data
+function truncateInputData(domStructure, userData) {
+    // Create a mapping of field names to their likely purpose
+    const fieldMappings = {
+        'title': ['title', 'prefix', 'mr', 'mrs', 'ms', 'dr'],
+        'firstname': ['first', 'firstname', 'frstname', 'given'],
+        'lastname': ['last', 'lastname', 'surname', 'family'],
+        'fullname': ['full', 'fullname', 'name'],
+        'email': ['email', 'mail'],
+        'phone': ['phone', 'tel', 'mobile', 'cell'],
+        'address': ['address', 'street', 'location'],
+        'company': ['company', 'employer', 'organization'],
+        'position': ['position', 'job', 'role', 'title']
+    };
+
+    // Get all text, email, and tel fields
+    const fields = Object.entries(domStructure)
+        .filter(([_, field]) => field.type === 'text' || field.type === 'email' || field.type === 'tel')
+        .reduce((acc, [key, field]) => {
+            acc[key] = {
+                name: field.name,
+                type: field.type
+            };
+            return acc;
+        }, {});
+
+    // Return complete user data and all fields
+    return {
+        fields,
+        userData: {
+            personal_information: userData.personal_information || {},
+            resume: userData.resume || {},
+            cover_letter: userData.cover_letter || {},
+            references: userData.references || []
+        }
+    };
 }
 
 async function setupCollections() {
@@ -232,8 +253,8 @@ async function connectToDatabase() {
         // Set up collections and indexes
         await setupCollections();
         
-        // Initialize LangChain on server start
-        await initializeLangChain();
+        // Initialize Ollama on server start
+        await initializeOllama();
         
         console.log("Successfully connected to MongoDB Atlas!");
     } catch (error) {
@@ -308,6 +329,46 @@ app.post('/test', (req, res) => {
     console.log('POST /test - Received test data');
     console.log('Received data:', req.body);
     res.json({ message: 'Data received successfully', data: req.body });
+});
+
+// Add new test endpoint for LLM
+app.post('/test-llm', async (req, res) => {
+    console.log('POST /test-llm - Testing LLM functionality');
+    try {
+        if (!ollamaModel) {
+            return res.status(503).json({ error: 'Ollama model not initialized' });
+        }
+
+        const { prompt } = req.body;
+        if (!prompt) {
+            return res.status(400).json({ error: 'Prompt is required' });
+        }
+
+        const response = await ollama.chat({
+            model: 'gemma3:1b',
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are a helpful assistant. Respond briefly and concisely.'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ]
+        });
+        
+        res.json({
+            success: true,
+            response: response.message.content
+        });
+    } catch (error) {
+        console.error('Error testing LLM:', error);
+        res.status(500).json({ 
+            error: 'Error testing LLM',
+            details: error.message
+        });
+    }
 });
 
 // Upload endpoint
@@ -550,7 +611,7 @@ app.post('/save-user-data', validateRequest, (req, res, next) => {
             references: ensureArray(userData.references)
         };
 
-        console.log('Saving document:', JSON.stringify(documentToSave, null, 2));
+        // console.log('Saving document:', JSON.stringify(documentToSave, null, 2));
 
         // Check if user data already exists
         const existingUser = await UserData.findOne({ uid });
@@ -661,7 +722,7 @@ function rateLimiter(req, res, next) {
 // Apply to routes
 app.use('/api/', rateLimiter);
 
-// Add analyze-form endpoint
+// Update the analyze-form endpoint
 app.post('/analyze-form', async (req, res) => {
     console.log('POST /analyze-form - Analyzing form structure');
     try {
@@ -671,81 +732,67 @@ app.post('/analyze-form', async (req, res) => {
             return res.status(400).json({ error: 'DOM structure and user data are required' });
         }
 
-        // Prepare the prompt for the LLM
-        const systemPrompt = `You are an AI assistant that helps fill out job application forms. 
-        Given a form structure and user data, you need to match form fields with appropriate user data.
-        Return an array of objects with 'selector' and 'value' properties.
-        The selector should be the most reliable way to identify the field (id, name, or label).
-        The value should be the appropriate data from the user object.
-        Only include fields that you are confident about matching.`;
+        // Process all fields at once
+        const { fields, userData: completeUserData } = truncateInputData(domStructure, userData);
 
-        // Truncate and format the input data to reduce token count
-        const truncatedDomStructure = Object.fromEntries(
-            Object.entries(domStructure)
-                .slice(0, 10)  // Further reduced to 10 form fields
-                .map(([key, value]) => [
-                    key,
-                    typeof value === 'object' ? {
-                        tag: value.tag,
-                        type: value.type,
-                        id: value.id,
-                        name: value.name,
-                        label: value.label?.substring(0, 30)  // Further reduced label length
-                    } : value
-                ])
-        );
+        // Prepare the prompt for Ollama
+        const userPrompt = `Analyze the following form fields and user data to create fill instructions.
+        Return an array of JSON objects in the format [{selector: "field_id", value: "value_to_fill"}].
+        
+        Form Fields:
+        ${JSON.stringify(fields, null, 2)}
+        
+        User Data:
+        ${JSON.stringify(completeUserData, null, 2)}
+        
+        Instructions:
+        1. Match each form field to the most appropriate user data
+        2. Consider field names, types, and context
+        3. Return only valid JSON array with selector and value pairs
+        4. If no match is found for a field, omit it from the results`;
 
-        // Simplify user data structure
-        const truncatedUserData = {
-            personal_information: {
-                full_name: userData.personal_information?.full_name,
-                contact_details: {
-                    email: userData.personal_information?.contact_details?.email,
-                    phone_number: userData.personal_information?.contact_details?.phone_number
-                }
-            },
-            resume: {
-                skills: userData.resume?.skills?.slice(0, 3),  // Further reduced to 3 skills
-                education: userData.resume?.education?.slice(0, 1)?.map(edu => ({
-                    degree: edu.degree,
-                    institution: edu.institution
-                })),
-                experience: userData.resume?.experience?.slice(0, 1)?.map(exp => ({
-                    job_title: exp.job_title,
-                    company: exp.company
-                }))
-            }
-        };
+        try {
+            const response = await ollama.chat({
+                model: 'gemma3:1b',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are a form field analyzer. Your task is to match form fields with user data and return the results in a specific JSON format.
+                        Rules:
+                        1. Always return a valid JSON array
+                        2. Each object must have 'selector' and 'value' properties
+                        3. Use exact field IDs as selectors
+                        4. Match fields based on name, type, and context
+                        5. Skip fields that don't have a clear match
+                        6. Format values appropriately for each field type`
+                    },
+                    {
+                        role: 'user',
+                        content: userPrompt
+                    }
+                ]
+            });
 
-        let fillInstructions;
-
-        // Try LangChain if available
-        if (langchainModel) {
-            try {
-                const systemMessage = new SystemMessage(systemPrompt);
-                const humanMessage = new HumanMessage(
-                    `Form Structure: ${JSON.stringify(truncatedDomStructure)}
-                    User Data: ${JSON.stringify(truncatedUserData)}
-                    Please provide fill instructions for this form.`
+            console.log('Response:', response.message.content);
+            const fillInstructions = JSON.parse(response.message.content);
+            if (Array.isArray(fillInstructions)) {
+                // Validate each instruction
+                const validInstructions = fillInstructions.filter(instruction => 
+                    instruction && 
+                    typeof instruction === 'object' &&
+                    instruction.selector && 
+                    instruction.value
                 );
-
-                const prompt = ChatPromptTemplate.fromMessages([systemMessage, humanMessage]);
-                const chain = prompt.pipe(langchainModel);
                 
-                const result = await chain.invoke({});
-                
-                fillInstructions = JSON.parse(result);
-                console.log('Successfully used LangChain model');
-            } catch (error) {
-                console.error('LangChain error:', error);
-                return res.status(500).json({ error: 'Error processing with LangChain model' });
+                console.log('Generated fill instructions:', validInstructions);
+                res.json(validInstructions);
+            } else {
+                throw new Error('Invalid response format - expected array');
             }
-        } else {
-            return res.status(503).json({ error: 'LLM model not available' });
+        } catch (error) {
+            console.error('Ollama error:', error);
+            res.status(500).json({ error: 'Error processing form analysis' });
         }
-
-        console.log('Generated fill instructions:', fillInstructions);
-        res.json(fillInstructions);
     } catch (error) {
         console.error('Error analyzing form:', error);
         res.status(500).json({ error: 'Error analyzing form' });
